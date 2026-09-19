@@ -1,4 +1,4 @@
-export { TpayClient, notificationResponse, parseNotificationPayload } from "./client.js";
+export { TpayClient, notificationResponse, parseNotificationPayload, verifyPaymentMd5Sum } from "./client.js";
 export type { TpayConfig } from "./client.js";
 export type {
     TpayAccountsApi,

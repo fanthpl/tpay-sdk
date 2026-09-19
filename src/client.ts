@@ -42,6 +42,7 @@ import type {
     TpayMccListResponse,
     TpayMerchantCreatedResponse,
     TpayNotification,
+    TpayPaymentNotification,
     TpayPaginationParams,
     TpayPay,
     TpayRefundCreatedResponse,
@@ -64,6 +65,11 @@ export interface TpayConfig {
     clientSecret: string;
     /** Use the sandbox environment (default: false). */
     sandbox?: boolean;
+    /**
+     * Notification security code from the Merchant Panel (Notifications -> Security).
+     * When set, the `md5sum` of every payment notification is verified as well.
+     */
+    securityCode?: string | undefined;
 }
 
 const ACCESS_TOKEN_EXPIRY_MARGIN_SECONDS = 60;
@@ -647,7 +653,11 @@ export class TpayClient {
      */
     async parseNotificationBody(body: string, jwsSignature: string, contentType?: string | null): Promise<TpayNotification> {
         await this.verifyJwsSignature(body, jwsSignature);
-        return parseNotificationPayload(body, contentType);
+        const notification = parseNotificationPayload(body, contentType);
+        if (this.config.securityCode !== undefined && "tr_id" in notification) {
+            verifyPaymentMd5Sum(notification, this.config.securityCode);
+        }
+        return notification;
     }
 
     /**
@@ -714,6 +724,25 @@ export function parseNotificationPayload(body: string, contentType?: string | nu
     }
 
     return payload as unknown as TpayNotification;
+}
+
+/**
+ * Checks the `md5sum` of a payment notification: `md5(id + tr_id + tr_amount + tr_crc + securityCode)`,
+ * where the security code comes from the Merchant Panel (Notifications -> Security).
+ *
+ * Called by `parseNotification()` when `securityCode` is set in the config. Exported for setups that
+ * verify notifications elsewhere, e.g. at the edge.
+ */
+export function verifyPaymentMd5Sum(notification: TpayPaymentNotification, securityCode: string): void {
+    const expected = crypto
+        .createHash("md5")
+        .update(notification.id + notification.tr_id + notification.tr_amount + notification.tr_crc + securityCode)
+        .digest();
+    const received = Buffer.from(notification.md5sum ?? "", "hex");
+
+    if (received.length !== expected.length || !crypto.timingSafeEqual(received, expected)) {
+        throw new Error("Invalid md5sum in the Tpay payment notification");
+    }
 }
 
 /**

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { notificationResponse, parseNotificationPayload } from "../src/index.js";
+import { notificationResponse, parseNotificationPayload, verifyPaymentMd5Sum } from "../src/index.js";
 import type { TpayBlikAliasNotification, TpayPaymentNotification } from "../src/index.js";
 
 const paymentBody = new URLSearchParams({
@@ -15,7 +15,7 @@ const paymentBody = new URLSearchParams({
     tr_error: "none",
     tr_email: "jan.kowalski@example.com",
     test_mode: "1",
-    md5sum: "9b7a1dbb7ec36e9b3f4f6de5bd1a7d33",
+    md5sum: "99e83308eb4d3c4ea0c5f84996e5169c",
 }).toString();
 
 test("parses a form encoded payment notification", () => {
@@ -54,4 +54,12 @@ test("parses JSON notifications even when the content type is missing", () => {
 test("answers form notifications with TRUE and JSON notifications with a result object", () => {
     assert.equal(notificationResponse(parseNotificationPayload(paymentBody)), "TRUE");
     assert.equal(notificationResponse({ type: "token_update", data: { token: "abc" } }), '{"result":true}');
+});
+
+test("accepts a correct md5sum and rejects a wrong one", () => {
+    const notification = parseNotificationPayload(paymentBody) as TpayPaymentNotification;
+
+    verifyPaymentMd5Sum(notification, "secret-code");
+    assert.throws(() => verifyPaymentMd5Sum(notification, "wrong-code"), /Invalid md5sum/);
+    assert.throws(() => verifyPaymentMd5Sum({ ...notification, md5sum: "" }, "secret-code"), /Invalid md5sum/);
 });

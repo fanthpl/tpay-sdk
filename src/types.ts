@@ -1660,7 +1660,10 @@ export interface TpayPaymentNotification {
     tr_error: string;
     /** Payer's email address. */
     tr_email: string;
-    /** Checksum, verified by `TpayClient.parseNotification()`. */
+    /**
+     * Checksum, `md5(id + tr_id + tr_amount + tr_crc + securityCode)`. Verified by
+     * `TpayClient.parseNotification()` when `securityCode` is set in the config.
+     */
     md5sum: string;
     /** `1` for a test transaction, `0` otherwise. */
     test_mode?: "0" | "1";
@@ -1674,6 +1677,12 @@ export interface TpayPaymentNotification {
     masterpass?: string;
     /** Card token, sent when the payer agreed to save their card. */
     card_token?: string;
+    /** Token expiry date in `MMYY` format. */
+    token_expiry_date?: string;
+    /** Last four digits of the card number. */
+    card_tail?: string;
+    /** Card brand, e.g. "Visa" or "Mastercard". */
+    card_brand?: string;
     tokenPaymentData_tokenValue?: string;
     tokenPaymentData_initialTransactionId?: string;
     /** Token expiry date in `MMYY` format. */
@@ -1746,6 +1755,8 @@ export interface TpayBlikAliasNotification {
     /** Merchant numeric identifier. */
     id: string;
     event: "ALIAS_REGISTER" | "ALIAS_UNREGISTER" | "ALIAS_UPDATE" | "ALIAS_EXPIRED";
+    /** Checksum. Tpay does not document its formula for alias events, so the SDK leaves it alone. */
+    md5sum: string;
     msg_value: {
         /** Alias value, unique per customer. */
         value: string;
