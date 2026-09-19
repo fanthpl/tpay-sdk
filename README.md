@@ -27,6 +27,8 @@ const client = new TpayClient({
     clientId: process.env.TPAY_CLIENT_ID!,
     clientSecret: process.env.TPAY_CLIENT_SECRET!,
     sandbox: process.env.TPAY_IS_SANDBOX === "true",
+    // Optional: Settings -> Notifications -> Security Code. Only used to verify the md5sum of payment notifications
+    securityCode: process.env.TPAY_SECURITY_CODE,
 });
 
 const transaction = await client.transactions.create({
@@ -61,8 +63,9 @@ as `application/x-www-form-urlencoded`, some as `application/json`, and they exp
 against the certificate named by the `x5u` header, which is itself verified against the Tpay root CA and then
 cached) and returns a typed discriminated union. It throws if any of that does not check out.
 
-The legacy `md5sum` field is not checked - the JWS signature already covers the whole body, so the shared
-notification security code is not needed.
+The JWS signature already covers the whole body, so the legacy `md5sum` is optional. Set `securityCode`
+in the config (Merchant Panel -> Notifications -> Security) and payment notifications get their
+`md5sum` checked too - `md5(id + tr_id + tr_amount + tr_crc + securityCode)`. Leave it out to skip that.
 
 ```ts
 import { TpayClient, notificationResponse } from "@fanth/tpay-sdk";
@@ -90,7 +93,8 @@ See [examples/03_notification.ts](./examples/03_notification.ts) for every branc
 
 If your framework hands you the raw body instead of a `Request`, use
 `client.parseNotificationBody(body, jwsSignature, contentType)`. If you verify the signature elsewhere
-(e.g. at the edge), `parseNotificationPayload(body, contentType)` just parses.
+(e.g. at the edge), `parseNotificationPayload(body, contentType)` just parses, and
+`verifyPaymentMd5Sum(notification, securityCode)` checks the checksum on its own.
 
 > Note: `parseNotification` reads the body via `request.text()`, so pass it the raw `Request` before any other
 > code consumes the body - the signature is computed over the exact bytes Tpay sent.
